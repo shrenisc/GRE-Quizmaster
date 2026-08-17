@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../models/user_progress.dart';
 
 class ProgressRepository {
@@ -18,8 +19,8 @@ class ProgressRepository {
       if (doc.exists) {
         final data = doc.data()!;
         return UserProgress(
-          xp: data['xp'] ?? 0,
-          streakDays: data['streak'] ?? 0,
+          xp: (data['xp'] as num?)?.toInt() ?? 0,
+          streakDays: (data['streak'] as num?)?.toInt() ?? 0,
           lastActive: data['lastActive'] != null
               ? (data['lastActive'] as Timestamp).toDate()
               : DateTime.now(),
@@ -57,7 +58,7 @@ class ProgressRepository {
           .get();
 
       if (doc.exists) {
-        return doc.data()?['score'] ?? 0;
+        return (doc.data()?['score'] as num?)?.toInt() ?? 0;
       }
     } catch (e) {
       print('Error getting group score: $e');
@@ -80,6 +81,29 @@ class ProgressRepository {
       }
     } catch (e) {
       print('Error saving group score: $e');
+    }
+  }
+
+  Future<List<String>> getMissedWords() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getStringList('missed_words') ?? [];
+  }
+
+  Future<void> addMissedWord(String word) async {
+    final prefs = await SharedPreferences.getInstance();
+    final missed = prefs.getStringList('missed_words') ?? [];
+    if (!missed.contains(word)) {
+      missed.add(word);
+      await prefs.setStringList('missed_words', missed);
+    }
+  }
+
+  Future<void> removeMissedWord(String word) async {
+    final prefs = await SharedPreferences.getInstance();
+    final missed = prefs.getStringList('missed_words') ?? [];
+    if (missed.contains(word)) {
+      missed.remove(word);
+      await prefs.setStringList('missed_words', missed);
     }
   }
 }

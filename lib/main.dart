@@ -29,7 +29,7 @@ class GreVocabQuestApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'GRE Quizmaster',
-      theme: AppTheme.darkTheme,
+      theme: AppTheme.lightTheme,
       debugShowCheckedModeBanner: false,
       home: const AuthGate(),
       onGenerateRoute: (settings) {

@@ -5,6 +5,8 @@ import '../../data/repositories/vocab_repository.dart';
 import '../../data/repositories/progress_repository.dart';
 import '../widgets/glass_card.dart';
 import '../widgets/neon_button.dart';
+import '../theme/app_theme.dart';
+import 'package:confetti/confetti.dart';
 
 class GroupDrillView extends StatefulWidget {
   final int groupId;
@@ -30,11 +32,20 @@ class _GroupDrillViewState extends State<GroupDrillView> {
   int _correctOptionIndex = 0;
   int _selectedOptionIndex = -1;
 
+  late ConfettiController _confettiController;
+
   @override
   void initState() {
     super.initState();
+    _confettiController = ConfettiController(duration: const Duration(seconds: 3));
     _allWords = _vocabRepo.getAllWords();
     _startDrill();
+  }
+
+  @override
+  void dispose() {
+    _confettiController.dispose();
+    super.dispose();
   }
 
   void _startDrill() {
@@ -75,6 +86,8 @@ class _GroupDrillViewState extends State<GroupDrillView> {
       _answered = true;
       if (index == _correctOptionIndex) {
         _score++;
+      } else {
+        _progressRepo.addMissedWord(_words[_currentIndex].word);
       }
     });
   }
@@ -91,6 +104,7 @@ class _GroupDrillViewState extends State<GroupDrillView> {
       setState(() {
         _drillFinished = true;
       });
+      _confettiController.play();
     }
   }
 
@@ -129,104 +143,135 @@ class _GroupDrillViewState extends State<GroupDrillView> {
           ),
         ),
       body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(24.0),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Text(
-                '${_currentIndex + 1} / ${_words.length}',
-                textAlign: TextAlign.center,
-                style: const TextStyle(color: Colors.white54),
-              ),
-              const SizedBox(height: 24),
-              GlassCard(
-                padding: const EdgeInsets.symmetric(vertical: 40, horizontal: 24),
-                child: Center(
-                  child: Text(
-                    currentWord.word,
-                    style: Theme.of(context).textTheme.displayLarge?.copyWith(fontSize: 40),
-                    textAlign: TextAlign.center,
+          child: Padding(
+            padding: const EdgeInsets.all(24.0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Text(
+                  '${_currentIndex + 1} / ${_words.length}',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(color: Colors.grey.shade600, fontSize: 16, fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 24),
+                AnimatedSwitcher(
+                  duration: const Duration(milliseconds: 300),
+                  child: GlassCard(
+                    key: ValueKey<int>(_currentIndex),
+                    padding: const EdgeInsets.symmetric(vertical: 40, horizontal: 24),
+                    child: Center(
+                      child: Text(
+                        currentWord.word,
+                        style: Theme.of(context).textTheme.displayLarge?.copyWith(fontSize: 40),
+                        textAlign: TextAlign.center,
+                      ),
+                    ),
                   ),
                 ),
-              ),
-              const SizedBox(height: 40),
-              Expanded(
-                child: ListView.builder(
-                  itemCount: _currentOptions.length,
-                  itemBuilder: (context, index) {
-                    bool isCorrect = index == _correctOptionIndex;
-                    bool isSelected = index == _selectedOptionIndex;
-                    
-                    Color buttonColor = Colors.white.withOpacity(0.1);
-                    if (_answered) {
-                      if (isCorrect) {
-                        buttonColor = Colors.green.withOpacity(0.6);
-                      } else if (isSelected) {
-                        buttonColor = Colors.red.withOpacity(0.6);
+                const SizedBox(height: 40),
+                Expanded(
+                  child: ListView.builder(
+                    itemCount: _currentOptions.length,
+                    itemBuilder: (context, index) {
+                      bool isCorrect = index == _correctOptionIndex;
+                      bool isSelected = index == _selectedOptionIndex;
+                      
+                      Color buttonColor = Colors.white;
+                      if (_answered) {
+                        if (isCorrect) {
+                          buttonColor = Colors.green.shade100;
+                        } else if (isSelected) {
+                          buttonColor = Colors.red.shade100;
+                        }
                       }
-                    }
 
-                    return Padding(
-                      padding: const EdgeInsets.only(bottom: 16.0),
-                      child: InkWell(
-                        onTap: () => _selectOption(index),
-                        borderRadius: BorderRadius.circular(16),
-                        child: Container(
-                          padding: const EdgeInsets.all(20),
+                      return Padding(
+                        padding: const EdgeInsets.only(bottom: 16.0),
+                        child: AnimatedContainer(
+                          duration: const Duration(milliseconds: 200),
+                          curve: Curves.easeInOut,
                           decoration: BoxDecoration(
                             color: buttonColor,
                             borderRadius: BorderRadius.circular(16),
                             border: Border.all(
-                              color: isSelected ? Colors.white : Colors.white24,
+                              color: isSelected ? Colors.grey.shade400 : Colors.grey.shade200,
                               width: isSelected ? 2 : 1,
                             ),
                           ),
-                          child: Text(
-                            _currentOptions[index],
-                            style: const TextStyle(fontSize: 16),
-                            textAlign: TextAlign.center,
+                          child: InkWell(
+                            onTap: () => _selectOption(index),
+                            borderRadius: BorderRadius.circular(16),
+                            child: Padding(
+                              padding: const EdgeInsets.all(20),
+                              child: Text(
+                                _currentOptions[index],
+                                style: const TextStyle(fontSize: 16, color: Colors.black87),
+                                textAlign: TextAlign.center,
+                              ),
+                            ),
                           ),
                         ),
-                      ),
-                    );
-                  },
-                ),
-              ),
-              if (_answered) ...[
-                GlassCard(
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
-                    children: [
-                      if (currentWord.synonyms.isNotEmpty)
-                        Text(
-                          'Synonyms: ${currentWord.synonyms}',
-                          style: const TextStyle(color: Colors.orangeAccent, fontStyle: FontStyle.italic),
-                          textAlign: TextAlign.center,
-                        ),
-                      if (currentWord.exampleSentence.isNotEmpty)
-                        Padding(
-                          padding: const EdgeInsets.only(top: 8.0),
-                          child: Text(
-                            'Usage: "${currentWord.exampleSentence}"',
-                            style: const TextStyle(color: Colors.white70),
-                            textAlign: TextAlign.center,
-                          ),
-                        ),
-                      if (currentWord.synonyms.isEmpty && currentWord.exampleSentence.isEmpty)
-                        const Text('Correct definition shown in green.', style: TextStyle(color: Colors.white70)),
-                    ],
+                      );
+                    },
                   ),
                 ),
-                const SizedBox(height: 16),
-                NeonButton(
-                  label: _currentIndex < _words.length - 1 ? 'Next Word' : 'Finish Drill',
-                  onPressed: _nextQuestion,
-                ),
-              ]
-            ],
+                if (_answered) ...[
+                  TweenAnimationBuilder<double>(
+                    tween: Tween(begin: 0.0, end: 1.0),
+                    duration: const Duration(milliseconds: 400),
+                    builder: (context, value, child) {
+                      return Opacity(
+                        opacity: value,
+                        child: Transform.translate(
+                          offset: Offset(0, 10 * (1 - value)),
+                          child: child,
+                        ),
+                      );
+                    },
+                    child: GlassCard(
+                      padding: const EdgeInsets.all(16),
+                      child: Column(
+                        children: [
+                          if (currentWord.synonyms.isNotEmpty)
+                            Text(
+                              'Synonyms: ${currentWord.synonyms}',
+                              style: TextStyle(color: Colors.orange.shade800, fontStyle: FontStyle.italic),
+                              textAlign: TextAlign.center,
+                            ),
+                          if (currentWord.exampleSentence.isNotEmpty)
+                            Padding(
+                              padding: const EdgeInsets.only(top: 8.0),
+                              child: Text(
+                                'Usage: "${currentWord.exampleSentence}"',
+                                style: TextStyle(color: Colors.grey.shade800),
+                                textAlign: TextAlign.center,
+                              ),
+                            ),
+                          if (currentWord.synonyms.isEmpty && currentWord.exampleSentence.isEmpty)
+                            Text('Correct definition highlighted.', style: TextStyle(color: Colors.grey.shade600)),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  TweenAnimationBuilder<double>(
+                    tween: Tween(begin: 0.0, end: 1.0),
+                    duration: const Duration(milliseconds: 500),
+                    builder: (context, value, child) {
+                      return Opacity(
+                        opacity: value,
+                        child: child,
+                      );
+                    },
+                    child: NeonButton(
+                      label: _currentIndex < _words.length - 1 ? 'Next Word' : 'Finish Drill',
+                      onPressed: _nextQuestion,
+                    ),
+                  ),
+                ]
+              ],
+            ),
           ),
-        ),
       ),
     ));
   }
@@ -242,37 +287,52 @@ class _GroupDrillViewState extends State<GroupDrillView> {
           onPressed: () => Navigator.pop(context),
         ),
       ),
-      body: Center(
-        child: Padding(
-          padding: const EdgeInsets.all(24.0),
-          child: GlassCard(
-            padding: const EdgeInsets.all(40),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Text(
-                  'Group Complete!',
-                  style: TextStyle(fontSize: 32, fontWeight: FontWeight.bold),
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+      body: Stack(
+          alignment: Alignment.center,
+          children: [
+            Center(
+              child: Padding(
+                padding: const EdgeInsets.all(24.0),
+                child: GlassCard(
+                  padding: const EdgeInsets.all(40),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Text(
+                        'Group Complete!',
+                        style: TextStyle(fontSize: 32, fontWeight: FontWeight.bold),
+                      ),
+                      const SizedBox(height: 24),
+                      Text(
+                        'Your Score: $_score / ${_words.length}',
+                        style: const TextStyle(fontSize: 24, color: AppTheme.accentColor, fontWeight: FontWeight.bold),
+                      ),
+                      const SizedBox(height: 40),
+                      NeonButton(
+                        label: 'Replay Group',
+                        onPressed: _startDrill,
+                      ),
+                      const SizedBox(height: 16),
+                      TextButton(
+                        onPressed: () => Navigator.pop(context),
+                        child: Text('Back to Groups', style: TextStyle(fontSize: 18, color: Colors.grey.shade800)),
+                      ),
+                    ],
+                  ),
                 ),
-                const SizedBox(height: 24),
-                Text(
-                  'Your Score: $_score / ${_words.length}',
-                  style: const TextStyle(fontSize: 24, color: Colors.blueAccent),
-                ),
-                const SizedBox(height: 40),
-                NeonButton(
-                  label: 'Replay Group',
-                  onPressed: _startDrill,
-                ),
-                const SizedBox(height: 16),
-                TextButton(
-                  onPressed: () => Navigator.pop(context),
-                  child: const Text('Back to Groups', style: TextStyle(fontSize: 18, color: Colors.white70)),
-                ),
-              ],
+              ),
             ),
-          ),
-        ),
+            Align(
+              alignment: Alignment.topCenter,
+              child: ConfettiWidget(
+                confettiController: _confettiController,
+                blastDirectionality: BlastDirectionality.explosive,
+                shouldLoop: false,
+                colors: const [Colors.green, Colors.blue, Colors.pink, Colors.orange, Colors.purple],
+              ),
+            ),
+          ],
       ),
     );
   }

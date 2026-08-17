@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "297437106545",
+    "project_id": "gre-quizmaster",
+    "storage_bucket": "gre-quizmaster.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:297437106545:android:43b791672963d7f637e6d0",
+        "android_client_info": {
+          "package_name": "com.quizmaster.gre_vocab_quest"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDF0pexj1gH7H2nQD7ZnFRY6gpEqGMuEN8"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

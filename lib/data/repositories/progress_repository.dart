@@ -1,38 +1,85 @@
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import '../models/user_progress.dart';
 
 class ProgressRepository {
-  static const String _xpKey = 'xp';
-  static const String _streakKey = 'streak';
-  static const String _lastActiveKey = 'lastActive';
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  final FirebaseAuth _auth = FirebaseAuth.instance;
+
+  String? get _uid => _auth.currentUser?.uid;
 
   Future<UserProgress> getProgress() async {
-    final prefs = await SharedPreferences.getInstance();
-    final xp = prefs.getInt(_xpKey) ?? 0;
-    final streak = prefs.getInt(_streakKey) ?? 0;
-    final lastActiveStr = prefs.getString(_lastActiveKey);
-    final lastActive = lastActiveStr != null ? DateTime.parse(lastActiveStr) : DateTime.now();
+    if (_uid == null) {
+      return UserProgress(xp: 0, streakDays: 0, lastActive: DateTime.now());
+    }
 
-    return UserProgress(xp: xp, streakDays: streak, lastActive: lastActive);
+    try {
+      final doc = await _firestore.collection('users').doc(_uid).get();
+      if (doc.exists) {
+        final data = doc.data()!;
+        return UserProgress(
+          xp: data['xp'] ?? 0,
+          streakDays: data['streak'] ?? 0,
+          lastActive: data['lastActive'] != null
+              ? (data['lastActive'] as Timestamp).toDate()
+              : DateTime.now(),
+        );
+      }
+    } catch (e) {
+      print('Error getting progress: $e');
+    }
+    return UserProgress(xp: 0, streakDays: 0, lastActive: DateTime.now());
   }
 
   Future<void> saveProgress(UserProgress progress) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setInt(_xpKey, progress.xp);
-    await prefs.setInt(_streakKey, progress.streakDays);
-    await prefs.setString(_lastActiveKey, progress.lastActive.toIso8601String());
+    if (_uid == null) return;
+
+    try {
+      await _firestore.collection('users').doc(_uid).set({
+        'xp': progress.xp,
+        'streak': progress.streakDays,
+        'lastActive': progress.lastActive,
+      }, SetOptions(merge: true));
+    } catch (e) {
+      print('Error saving progress: $e');
+    }
   }
 
   Future<int> getGroupScore(int groupId) async {
-    final prefs = await SharedPreferences.getInstance();
-    return prefs.getInt('group_score_$groupId') ?? 0;
+    if (_uid == null) return 0;
+
+    try {
+      final doc = await _firestore
+          .collection('users')
+          .doc(_uid)
+          .collection('group_progress')
+          .doc(groupId.toString())
+          .get();
+
+      if (doc.exists) {
+        return doc.data()?['score'] ?? 0;
+      }
+    } catch (e) {
+      print('Error getting group score: $e');
+    }
+    return 0;
   }
 
   Future<void> saveGroupScore(int groupId, int score) async {
-    final prefs = await SharedPreferences.getInstance();
-    final currentScore = await getGroupScore(groupId);
-    if (score > currentScore) {
-      await prefs.setInt('group_score_$groupId', score);
+    if (_uid == null) return;
+
+    try {
+      final currentScore = await getGroupScore(groupId);
+      if (score > currentScore) {
+        await _firestore
+            .collection('users')
+            .doc(_uid)
+            .collection('group_progress')
+            .doc(groupId.toString())
+            .set({'score': score}, SetOptions(merge: true));
+      }
+    } catch (e) {
+      print('Error saving group score: $e');
     }
   }
 }

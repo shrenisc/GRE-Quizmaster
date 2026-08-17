@@ -104,12 +104,30 @@ class _GroupDrillViewState extends State<GroupDrillView> {
 
     final currentWord = _words[_currentIndex];
 
-    return Scaffold(
-      appBar: AppBar(
-        title: Text('Drill: Group ${widget.groupId}'),
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-      ),
+    return WillPopScope(
+      onWillPop: () async {
+        if (!_drillFinished) {
+          await _progressRepo.saveGroupScore(widget.groupId, _score);
+        }
+        return true;
+      },
+      child: Scaffold(
+        appBar: AppBar(
+          title: Text('Drill: Group ${widget.groupId}'),
+          backgroundColor: Colors.transparent,
+          elevation: 0,
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back),
+            onPressed: () async {
+              if (!_drillFinished) {
+                await _progressRepo.saveGroupScore(widget.groupId, _score);
+              }
+              if (context.mounted) {
+                Navigator.of(context).pop();
+              }
+            },
+          ),
+        ),
       body: SafeArea(
         child: Padding(
           padding: const EdgeInsets.all(24.0),
@@ -210,7 +228,7 @@ class _GroupDrillViewState extends State<GroupDrillView> {
           ),
         ),
       ),
-    );
+    ));
   }
 
   Widget _buildSummaryScreen() {

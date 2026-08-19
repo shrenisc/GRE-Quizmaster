@@ -9,6 +9,7 @@ import 'ui/views/group_drill_view.dart';
 import 'ui/views/exam_mode_view.dart';
 import 'ui/views/review_queue_view.dart';
 import 'ui/views/auth/login_screen.dart';
+import 'ui/views/profile_view.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -43,6 +44,8 @@ class GreVocabQuestApp extends StatelessWidget {
             return MaterialPageRoute(builder: (_) => const ExamModeView());
           case '/review_queue':
             return MaterialPageRoute(builder: (_) => const ReviewQueueView());
+          case '/profile':
+            return MaterialPageRoute(builder: (_) => const ProfileView());
           default:
             return MaterialPageRoute(builder: (_) => const AuthGate());
         }

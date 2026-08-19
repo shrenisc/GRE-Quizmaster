@@ -67,6 +67,13 @@ class _DashboardViewState extends State<DashboardView> {
                         XpBadge(xp: _progress!.xp, streak: _progress!.streakDays)
                       else
                         const SizedBox(width: 80, height: 40, child: CircularProgressIndicator()),
+                      const SizedBox(width: 12),
+                      IconButton(
+                        icon: const Icon(Icons.person, color: Colors.white),
+                        onPressed: () {
+                          Navigator.pushNamed(context, '/profile');
+                        },
+                      ),
                     ],
                   ),
                 ),

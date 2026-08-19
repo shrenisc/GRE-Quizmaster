@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../data/models/exam_question.dart';
 import '../../data/repositories/exam_repository.dart';
+import '../../data/repositories/progress_repository.dart';
 import '../widgets/glass_card.dart';
 import '../widgets/neon_button.dart';
 
@@ -13,6 +14,7 @@ class ExamModeView extends StatefulWidget {
 
 class _ExamModeViewState extends State<ExamModeView> {
   final ExamRepository _examRepo = ExamRepository();
+  final ProgressRepository _progressRepo = ProgressRepository();
   
   List<ExamQuestion> _questions = [];
   int _currentIndex = 0;
@@ -96,13 +98,20 @@ class _ExamModeViewState extends State<ExamModeView> {
     });
   }
 
-  void _nextQuestion() {
+  void _nextQuestion() async {
     if (_currentIndex < _questions.length - 1) {
       setState(() {
         _currentIndex++;
         _resetSelection();
       });
     } else {
+      final currentProgress = await _progressRepo.getProgress();
+      final newProgress = currentProgress.copyWith(
+        xp: currentProgress.xp + (_score * 20), // Exams give more XP
+        lastActive: DateTime.now(),
+      );
+      await _progressRepo.saveProgress(newProgress);
+
       setState(() {
         _examFinished = true;
       });

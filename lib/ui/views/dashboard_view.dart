@@ -3,9 +3,34 @@ import '../theme/app_theme.dart';
 import '../widgets/glass_card.dart';
 import '../widgets/neon_button.dart';
 import '../widgets/xp_badge.dart';
+import '../../data/repositories/progress_repository.dart';
+import '../../data/models/user_progress.dart';
 
-class DashboardView extends StatelessWidget {
+class DashboardView extends StatefulWidget {
   const DashboardView({Key? key}) : super(key: key);
+
+  @override
+  _DashboardViewState createState() => _DashboardViewState();
+}
+
+class _DashboardViewState extends State<DashboardView> {
+  final ProgressRepository _progressRepo = ProgressRepository();
+  UserProgress? _progress;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadProgress();
+  }
+
+  void _loadProgress() async {
+    final progress = await _progressRepo.getProgress();
+    if (mounted) {
+      setState(() {
+        _progress = progress;
+      });
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -38,7 +63,10 @@ class DashboardView extends StatelessWidget {
                           style: Theme.of(context).textTheme.displayLarge?.copyWith(fontSize: 32),
                         ),
                       ),
-                      const XpBadge(xp: 1250, streak: 5), // Mock data
+                      if (_progress != null)
+                        XpBadge(xp: _progress!.xp, streak: _progress!.streakDays)
+                      else
+                        const SizedBox(width: 80, height: 40, child: CircularProgressIndicator()),
                     ],
                   ),
                 ),

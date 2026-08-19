@@ -32,6 +32,9 @@ class _GroupDrillViewState extends State<GroupDrillView> {
   int _correctOptionIndex = 0;
   int _selectedOptionIndex = -1;
 
+  bool _isLoading = true;
+  int _sessionScore = 0;
+  Set<String> _wordsGottenWrong = {};
   late ConfettiController _confettiController;
 
   @override
@@ -48,15 +51,53 @@ class _GroupDrillViewState extends State<GroupDrillView> {
     super.dispose();
   }
 
-  void _startDrill() {
+  void _startDrill() async {
     setState(() {
-      _words = _vocabRepo.getWordsForGroup(widget.groupId);
-      _words.shuffle();
-      _currentIndex = 0;
+      _isLoading = true;
       _score = 0;
+      _sessionScore = 0;
       _drillFinished = false;
+      _wordsGottenWrong.clear();
     });
+
+    final remainingWordStrings = await _progressRepo.getIncompleteDrill(widget.groupId);
+
+    setState(() {
+      if (remainingWordStrings != null && remainingWordStrings.isNotEmpty) {
+        // Resume drill
+        _words = remainingWordStrings.map((wStr) {
+          return _allWords.firstWhere((w) => w.word == wStr, orElse: () => _allWords.first);
+        }).toList();
+        // Fetch partial score
+        _progressRepo.getGroupScore(widget.groupId).then((savedScore) {
+          if (mounted) setState(() => _score = savedScore);
+        });
+      } else {
+        // New drill
+        _words = _vocabRepo.getWordsForGroup(widget.groupId);
+        _words.shuffle();
+      }
+      
+      _currentIndex = 0;
+      _isLoading = false;
+    });
+    
     _generateOptions();
+  }
+
+  Future<bool> _handleSave() async {
+    if (!_drillFinished) {
+      final remainingWords = _words.sublist(_currentIndex).map((w) => w.word).toList();
+      await _progressRepo.saveIncompleteDrill(widget.groupId, remainingWords, _score);
+
+      final currentProgress = await _progressRepo.getProgress();
+      final newProgress = currentProgress.copyWith(
+        xp: currentProgress.xp + (_sessionScore * 10),
+        lastActive: DateTime.now(),
+      );
+      await _progressRepo.saveProgress(newProgress);
+    }
+    return true; // Allow pop
   }
 
   void _generateOptions() {
@@ -84,10 +125,25 @@ class _GroupDrillViewState extends State<GroupDrillView> {
     setState(() {
       _selectedOptionIndex = index;
       _answered = true;
+      
+      final currentWord = _words[_currentIndex];
       if (index == _correctOptionIndex) {
-        _score++;
+        if (!_wordsGottenWrong.contains(currentWord.word)) {
+          _score++;
+          _sessionScore++;
+        }
       } else {
-        _progressRepo.addMissedWord(_words[_currentIndex].word);
+        _progressRepo.addMissedWord(currentWord.word);
+        _wordsGottenWrong.add(currentWord.word);
+        
+        // Re-insert this word randomly later in the queue
+        final remainingCount = _words.length - 1 - _currentIndex;
+        if (remainingCount > 0) {
+          final insertIndex = Random().nextInt(remainingCount) + _currentIndex + 1;
+          _words.insert(insertIndex, currentWord);
+        } else {
+          _words.add(currentWord);
+        }
       }
     });
   }
@@ -99,8 +155,17 @@ class _GroupDrillViewState extends State<GroupDrillView> {
       });
       _generateOptions();
     } else {
-      // Save score
+      // Save score (this will also clear the incomplete drill)
       await _progressRepo.saveGroupScore(widget.groupId, _score);
+      
+      // Update overall XP
+      final currentProgress = await _progressRepo.getProgress();
+      final newProgress = currentProgress.copyWith(
+        xp: currentProgress.xp + (_sessionScore * 10), // 10 XP per correct word this session
+        lastActive: DateTime.now(),
+      );
+      await _progressRepo.saveProgress(newProgress);
+
       setState(() {
         _drillFinished = true;
       });
@@ -110,6 +175,9 @@ class _GroupDrillViewState extends State<GroupDrillView> {
 
   @override
   Widget build(BuildContext context) {
+    if (_isLoading) {
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    }
     if (_words.isEmpty) return const Scaffold(body: Center(child: Text('No words found.')));
 
     if (_drillFinished) {
@@ -119,30 +187,25 @@ class _GroupDrillViewState extends State<GroupDrillView> {
     final currentWord = _words[_currentIndex];
 
     return WillPopScope(
-      onWillPop: () async {
-        if (!_drillFinished) {
-          await _progressRepo.saveGroupScore(widget.groupId, _score);
-        }
-        return true;
-      },
+      onWillPop: _handleSave,
       child: Scaffold(
+        extendBodyBehindAppBar: true,
         appBar: AppBar(
-          title: Text('Drill: Group ${widget.groupId}'),
+          title: Text('Group ${widget.groupId} Drill'),
           backgroundColor: Colors.transparent,
           elevation: 0,
-          leading: IconButton(
-            icon: const Icon(Icons.arrow_back),
-            onPressed: () async {
-              if (!_drillFinished) {
-                await _progressRepo.saveGroupScore(widget.groupId, _score);
-              }
-              if (context.mounted) {
-                Navigator.of(context).pop();
-              }
-            },
-          ),
+          actions: [
+            TextButton.icon(
+              icon: const Icon(Icons.save, color: Colors.white),
+              label: const Text('Save & Exit', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+              onPressed: () async {
+                await _handleSave();
+                if (mounted) Navigator.of(context).pop();
+              },
+            ),
+          ],
         ),
-      body: SafeArea(
+        body: SafeArea(
           child: Padding(
             padding: const EdgeInsets.all(24.0),
             child: Column(
